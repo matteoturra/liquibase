@@ -1,6 +1,7 @@
 package liquibase.snapshot.jvm;
 
 import liquibase.CatalogAndSchema;
+import liquibase.Scope;
 import liquibase.database.Database;
 import liquibase.database.core.*;
 import liquibase.exception.DatabaseException;
@@ -25,8 +26,6 @@ import java.util.StringJoiner;
  * Snapshot generator for a SEQUENCE object in a JDBC-accessible database
  */
 public class SequenceSnapshotGenerator extends JdbcSnapshotGenerator {
-
-    private Logger log = LogFactory.getInstance().getLog(SequenceSnapshotGenerator.class.getSimpleName());
 
     public SequenceSnapshotGenerator() {
         super(Sequence.class, new Class[]{Schema.class});
@@ -206,7 +205,7 @@ public class SequenceSnapshotGenerator extends JdbcSnapshotGenerator {
             try {
                 version = database.getDatabaseMajorVersion();
             } catch (Exception ignore) {
-                log.warning("Failed to retrieve database version: " + ignore);
+                Scope.getCurrentScope().getLog(getClass()).warning("Failed to retrieve database version: " + ignore);
             }
             if (version < 10) { // 'pg_sequence' view does not exists yet
                 return "SELECT c.relname AS \"SEQUENCE_NAME\" FROM pg_class c " +
