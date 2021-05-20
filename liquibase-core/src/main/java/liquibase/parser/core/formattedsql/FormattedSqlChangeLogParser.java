@@ -207,10 +207,11 @@ public class FormattedSqlChangeLogParser implements ChangeLogParser {
                        logicalFilePath = changeLog.getLogicalFilePath ();
                     }
                     String dbms = parseString(dbmsPatternMatcher);
-
+                    String changeSetId = changeLogParameters.expandExpressions(changeSetPatternMatcher.group(2), changeLog);
+                    String author = changeSetPatternMatcher.group(1);
 
                     changeSet =
-                       new ChangeSet(changeSetPatternMatcher.group(2), changeSetPatternMatcher.group(1), runAlways, runOnChange, logicalFilePath, context, dbms, runWith, runInTransaction, changeLog.getObjectQuotingStrategy(), changeLog);
+                       new ChangeSet(changeSetId, author, runAlways, runOnChange, logicalFilePath, context, dbms, runWith, runInTransaction, changeLog.getObjectQuotingStrategy(), changeLog);
                     changeSet.setLabels(new Labels(labels));
                     changeSet.setFailOnError(failOnError);
                     changeLog.addChangeSet(changeSet);
