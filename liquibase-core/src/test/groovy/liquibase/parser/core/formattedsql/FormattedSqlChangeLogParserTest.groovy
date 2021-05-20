@@ -258,6 +258,24 @@ select 1
         changeLog.getChangeSets().get(0).getComments() == "This is a test comment"
     }
 
+    def parse_withChangeSetIdParam() throws Exception {
+        when:
+        ChangeLogParameters params = new ChangeLogParameters()
+        params.set("param1", "samplevalue1")
+
+        String changeLogWithComment = "--liquibase formatted sql\n\n" +
+                "--changeset JohnDoe:12345_\${param1}\n" +
+                "--comment: This is a test comment\n" +
+                "create table test (id int);\n"
+
+
+        DatabaseChangeLog changeLog = new MockFormattedSqlChangeLogParser(changeLogWithComment).parse("asdf.sql", params, new JUnitResourceAccessor())
+
+        then:
+        changeLog.getChangeSets().size() == 1
+        changeLog.getChangeSets().get(0).getAuthor() == "JohnDoe"
+        changeLog.getChangeSets().get(0).getId() == "12345_samplevalue1"
+    }
     @Unroll
     def parse_multipleDbms() throws Exception {
         when:
