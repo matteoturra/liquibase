@@ -322,19 +322,19 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
                     );
                 }
 
-                boolean needsPreparedStatement = false;
-                if (usePreparedStatements != null && usePreparedStatements) {
-                    needsPreparedStatement = true;
+                boolean needsPreparedStatement = true;
+                if (usePreparedStatements != null && !usePreparedStatements) {
+                    needsPreparedStatement = false;
                 }
 
-                List<ColumnConfig> columnsFromCsv = new ArrayList<>();
+                List<LoadDataColumnConfig> columnsFromCsv = new ArrayList<>();
                 for (int i = 0; i < headers.length; i++) {
                     Object value = line[i];
                     String columnName = headers[i].trim();
 
-                    ColumnConfig valueConfig = new ColumnConfig();
+                    LoadDataColumnConfig valueConfig = new LoadDataColumnConfig();
 
-                    ColumnConfig columnConfig = getColumnConfig(i, headers[i].trim());
+                    LoadDataColumnConfig columnConfig = getColumnConfig(i, headers[i].trim());
                     if (columnConfig != null) {
                         if ("skip".equalsIgnoreCase(columnConfig.getType())) {
                             continue;
@@ -352,6 +352,7 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
                             valueConfig.setType(columnConfig.getType());
                         }
                         valueConfig.setName(columnName);
+                        valueConfig.setAllowUpdate(columnConfig.getAllowUpdate());
 
                         if (columnConfig.getType() != null) {
                             if (columnConfig.getType().equalsIgnoreCase(LOAD_DATA_TYPE.BOOLEAN.toString())) {
@@ -440,7 +441,7 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
                                     valueConfig.setValue(null);
                                 } else {
                                     valueConfig.setValue(value.toString());
-                                }                                
+                                }
                             } else if (columnConfig.getType().equalsIgnoreCase(LOAD_DATA_TYPE.OTHER.toString())) {
                                 valueConfig.setType(columnConfig.getType());
                                 if ("NULL".equalsIgnoreCase(value.toString())) {
@@ -474,13 +475,14 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
                 }
                 // end of: iterate through all the columns of a CSV line
 
-                // Try to use prepared statements if any of the two following conditions apply:
-                // 1. There is no other option than using a prepared statement (e.g. in cases of LOBs)
+                // Try to use prepared statements if any of the following conditions apply:
+                // 1. There is no other option than using a prepared statement (e.g. in cases of LOBs) regardless
+                //     of whether the 'usePreparedStatement' is set to false
                 // 2. The database supports batched statements (for improved performance) AND we are not in an
                 //    "SQL" mode (i.e. we generate an SQL file instead of actually modifying the database).
                 if
-                ((needsPreparedStatement || (databaseSupportsBatchUpdates && ! isLoggingExecutor(database) &&
-                        hasPreparedStatementsImplemented()))) {
+                ((needsPreparedStatement && (databaseSupportsBatchUpdates && ! isLoggingExecutor(database))) &&
+                        hasPreparedStatementsImplemented()) {
                     anyPreparedStatements = true;
                     ExecutablePreparedStatementBase stmt =
                         this.createPreparedStatement(
@@ -492,7 +494,7 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
                     InsertStatement insertStatement =
                         this.createStatement(getCatalogName(), getSchemaName(), getTableName());
 
-                    for (ColumnConfig column : columnsFromCsv) {
+                    for (LoadDataColumnConfig column : columnsFromCsv) {
                         String columnName = column.getName();
                         Object value = column.getValueObject();
 
@@ -501,6 +503,10 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
                         }
 
                         insertStatement.addColumnValue(columnName, value);
+
+                        if (insertStatement instanceof InsertOrUpdateStatement) {
+                            ((InsertOrUpdateStatement) insertStatement).setAllowColumnUpdate(columnName, column.getAllowUpdate() == null || column.getAllowUpdate());
+                        }
                     }
 
                     statements.add(insertStatement);
@@ -766,7 +772,7 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
 
     protected ExecutablePreparedStatementBase createPreparedStatement(
             Database database, String catalogName, String schemaName, String tableName,
-            List<ColumnConfig> columns, ChangeSet changeSet, ResourceAccessor resourceAccessor) {
+            List<LoadDataColumnConfig> columns, ChangeSet changeSet, ResourceAccessor resourceAccessor) {
         return new InsertExecutablePreparedStatement(database, catalogName, schemaName, tableName, columns,
                 changeSet, resourceAccessor);
     }
@@ -779,7 +785,7 @@ public class LoadDataChange extends AbstractChange implements ChangeWithColumns<
         return new InsertSetStatement(catalogName, schemaName, tableName);
     }
 
-    protected ColumnConfig getColumnConfig(int index, String header) {
+    protected LoadDataColumnConfig getColumnConfig(int index, String header) {
         for (LoadDataColumnConfig config : columns) {
             if ((config.getIndex() != null) && config.getIndex().equals(index)) {
                 return config;

@@ -3,15 +3,10 @@ package liquibase.change.core;
 import liquibase.Scope;
 import liquibase.change.*;
 import liquibase.changelog.ChangeLogParameters;
-import liquibase.changelog.ChangeSet;
-import liquibase.configuration.GlobalConfiguration;
-import liquibase.configuration.LiquibaseConfiguration;
+import liquibase.GlobalConfiguration;
 import liquibase.database.Database;
 import liquibase.database.DatabaseList;
-import liquibase.database.core.AbstractDb2Database;
-import liquibase.database.core.HsqlDatabase;
-import liquibase.database.core.MSSQLDatabase;
-import liquibase.database.core.OracleDatabase;
+import liquibase.database.core.*;
 import liquibase.exception.UnexpectedLiquibaseException;
 import liquibase.exception.ValidationErrors;
 import liquibase.statement.SqlStatement;
@@ -196,7 +191,7 @@ public class CreateProcedureChange extends AbstractChange implements DbmsTargete
         }
 
         if ((this.getReplaceIfExists() != null) && (DatabaseList.definitionMatches(getDbms(), database, true))) {
-            if (database instanceof MSSQLDatabase) {
+            if (database instanceof MSSQLDatabase || database instanceof MySQLDatabase) {
                 if (this.getReplaceIfExists() && (this.getProcedureName() == null)) {
                     validate.addError("procedureName is required if replaceIfExists = true");
                 }
@@ -254,8 +249,7 @@ public class CreateProcedureChange extends AbstractChange implements DbmsTargete
                 procedureText = "";
             }
 
-            String encoding =
-                LiquibaseConfiguration.getInstance().getConfiguration(GlobalConfiguration.class).getOutputEncoding();
+            String encoding = GlobalConfiguration.OUTPUT_ENCODING.getCurrentValue();
             if (procedureText != null) {
                 try {
                     stream = new ByteArrayInputStream(procedureText.getBytes(encoding));

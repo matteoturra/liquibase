@@ -2,7 +2,7 @@ package liquibase.integration.ant;
 
 import liquibase.Liquibase;
 import liquibase.Scope;
-import liquibase.configuration.GlobalConfiguration;
+import liquibase.GlobalConfiguration;
 import liquibase.configuration.LiquibaseConfiguration;
 import liquibase.database.Database;
 import liquibase.exception.DatabaseException;
@@ -36,6 +36,7 @@ public abstract class BaseLiquibaseTask extends Task {
 
     private AntClassLoader classLoader;
     private Liquibase liquibase;
+    private ResourceAccessor resourceAccessor;
 
     private Path classpath;
     private DatabaseType databaseType;
@@ -62,12 +63,12 @@ public abstract class BaseLiquibaseTask extends Task {
         validateParameters();
         final Database[] database = {null};
         try {
-            ResourceAccessor resourceAccessor = createResourceAccessor(classLoader);
+            resourceAccessor = createResourceAccessor(classLoader);
             scopeValues.put(Scope.Attr.resourceAccessor.name(), resourceAccessor);
             scopeValues.put(Scope.Attr.classLoader.name(), classLoader);
 
             Scope.child(scopeValues, () -> {
-                database[0] = createDatabaseFromType(databaseType);
+                database[0] = createDatabaseFromType(databaseType, resourceAccessor);
                 liquibase = new Liquibase(getChangeLogFile(), resourceAccessor, database[0]);
                 if (changeLogParameters != null) {
                     changeLogParameters.applyParameters(liquibase);
@@ -94,17 +95,24 @@ public abstract class BaseLiquibaseTask extends Task {
     protected abstract void executeWithLiquibaseClassloader() throws BuildException;
 
     protected Database createDatabaseFromConfiguredDatabaseType() {
-        return createDatabaseFromType(databaseType);
+        return createDatabaseFromType(databaseType, getResourceAccessor());
     }
 
-    protected Database createDatabaseFromType(DatabaseType databaseType) {
-        return databaseType.createDatabase(classLoader);
+    protected Database createDatabaseFromType(DatabaseType databaseType, ResourceAccessor resourceAccessor) {
+        return databaseType.createDatabase(resourceAccessor);
     }
 
     protected Liquibase getLiquibase() {
         return liquibase;
     }
 
+    protected ResourceAccessor getResourceAccessor() {
+        if (resourceAccessor == null) {
+            throw new IllegalStateException("The ResourceAccessor has not been initialized. This usually means this " +
+                    "method has been called before the task's execute method has called.");
+        }
+        return resourceAccessor;
+    }
 
     /**
      * This method is designed to be overridden by subclasses when a change log is needed. By default it returns null.
@@ -127,20 +135,15 @@ public abstract class BaseLiquibaseTask extends Task {
     }
 
     protected boolean shouldRun() {
-        LiquibaseConfiguration configuration = LiquibaseConfiguration.getInstance();
-        GlobalConfiguration globalConfiguration = configuration.getConfiguration(GlobalConfiguration.class);
-        if (!globalConfiguration.getShouldRun()) {
-            log("Liquibase did not run because " + configuration.describeValueLookupLogic(globalConfiguration
-                    .getProperty(GlobalConfiguration.SHOULD_RUN)) + " was set to false", Project.MSG_INFO);
+        if (!GlobalConfiguration.SHOULD_RUN.getCurrentValue()) {
+            log("Liquibase did not run because " + GlobalConfiguration.SHOULD_RUN.getKey() + " was set to false", Project.MSG_INFO);
             return false;
         }
         return true;
     }
 
     protected String getDefaultOutputEncoding() {
-        LiquibaseConfiguration liquibaseConfiguration = LiquibaseConfiguration.getInstance();
-        GlobalConfiguration globalConfiguration = liquibaseConfiguration.getConfiguration(GlobalConfiguration.class);
-        return globalConfiguration.getOutputEncoding();
+        return GlobalConfiguration.OUTPUT_ENCODING.getCurrentValue();
     }
 
     /**

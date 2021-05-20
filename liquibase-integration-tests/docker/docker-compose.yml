@@ -11,8 +11,10 @@ services:
       MYSQL_DATABASE: lbcat
       MYSQL_USER: lbuser
       MYSQL_PASSWORD: LiquibasePass1
+    networks:
+      - integration
     volumes:
-    - "./mysql-init.sql:/docker-entrypoint-initdb.d/mysql-init.sql"
+      - "./mysql-init.sql:/docker-entrypoint-initdb.d/mysql-init.sql"
 
   postgres-9:
     image: postgres:9
@@ -22,8 +24,17 @@ services:
     environment:
       POSTGRES_PASSWORD: LbRootPass1
       POSTGRES_DB: lbcat
+    networks:
+      - integration
     volumes:
       - "./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh"
+
+#  cockroachdb:
+#    image: cockroachdb/cockroach-unstable:v20.2.0-rc.3
+#    command: start-single-node --logtostderr --insecure
+#    ports:
+#      - "26257:26257"
+#      - "8080:8080"
 
   mssql:
     image: mcr.microsoft.com/mssql/server:2017-latest
@@ -33,7 +44,12 @@ services:
     environment:
       ACCEPT_EULA: Y
       SA_PASSWORD: LiquibasePass1
+    networks:
+      - integration
     volumes:
       - "./mssql-init.sh:/docker-entrypoint-initdb.d/mssql-init.sh"
       - "./mssql-init.sql:/docker-entrypoint-initdb.d/mssql-init.sql"
     entrypoint: /bin/bash /docker-entrypoint-initdb.d/mssql-init.sh
+
+networks:
+  integration:
